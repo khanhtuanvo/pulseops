@@ -1,0 +1,227 @@
+scalar Time
+scalar JSON
+
+enum IncidentStatus {
+  TRIGGERED
+  ACKNOWLEDGED
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Role {
+  OWNER
+  RESPONDER
+  VIEWER
+}
+
+enum IncidentEventType {
+  INCIDENT_CREATED
+  INCIDENT_ACKNOWLEDGED
+  INCIDENT_INVESTIGATING
+  INCIDENT_RESOLVED
+  INCIDENT_ESCALATED
+  ALERT_ATTACHED
+}
+
+type Incident {
+  id: ID!
+  title: String!
+  status: IncidentStatus!
+  severity: Severity!
+  teamId: ID!
+  fingerprint: String!
+  alertCount: Int!
+  triggeredAt: Time!
+  acknowledgedAt: Time
+  acknowledgedBy: User
+  resolvedAt: Time
+  resolvedBy: User
+  escalated: Boolean!
+  escalatedAt: Time
+  assignee: User
+  runbook: Runbook
+  statusMessage: String
+  mttr: Int
+  alerts: [Alert!]!
+}
+
+type Alert {
+  id: ID!
+  incidentId: ID!
+  source: String!
+  alertName: String!
+  severity: Severity!
+  environment: String!
+  payload: JSON!
+  fingerprint: String!
+  receivedAt: Time!
+}
+
+type User {
+  id: ID!
+  email: String!
+  name: String!
+  avatarUrl: String
+  teamId: ID!
+  role: Role!
+  googleSubject: String!
+  createdAt: Time!
+}
+
+type Team {
+  id: ID!
+  name: String!
+  members: [User!]!
+  onCallSchedule: OnCallSchedule
+  escalationPolicy: EscalationPolicy
+  apiKeyHint: String
+}
+
+type OnCallSchedule {
+  id: ID!
+  teamId: ID!
+  rotation: [User!]!
+  intervalDays: Int!
+  cycleStart: Time!
+  currentOnCall: User!
+  overrides: [ScheduleOverride!]!
+}
+
+type ScheduleOverride {
+  id: ID!
+  user: User!
+  startsAt: Time!
+  endsAt: Time!
+  reason: String!
+}
+
+type EscalationPolicy {
+  id: ID!
+  teamId: ID!
+  tiers: [EscalationTier!]!
+}
+
+type EscalationTier {
+  tierNumber: Int!
+  waitMinutes: Int!
+  notifyUserId: ID!
+  notifyUser: User!
+}
+
+type Runbook {
+  id: ID!
+  teamId: ID!
+  title: String!
+  content: String!
+  tags: [String!]!
+  updatedAt: Time!
+}
+
+type Postmortem {
+  id: ID!
+  incidentId: ID!
+  authorId: ID!
+  summary: String!
+  timeline: String!
+  actionItems: [String!]!
+  createdAt: Time!
+}
+
+type IncidentPage {
+  items: [Incident!]!
+  totalCount: Int!
+  hasMore: Boolean!
+}
+
+type Analytics {
+  mttrSeconds: Int!
+  mttaSeconds: Int!
+  totalCount: Int!
+  byDay: [DayStat!]!
+  bySeverity: [SeverityStat!]!
+}
+
+type DayStat {
+  date: Time!
+  count: Int!
+}
+
+type SeverityStat {
+  severity: Severity!
+  count: Int!
+}
+
+type IncidentEvent {
+  type: IncidentEventType!
+  incident: Incident!
+  actor: User
+  occurredAt: Time!
+}
+
+type OnCallStatusEvent {
+  teamId: ID!
+  currentOnCall: User!
+  nextOnCall: User!
+  handoffAt: Time!
+}
+
+type Query {
+  me: User!
+  incidents(
+    teamId: ID
+    status: IncidentStatus
+    severity: Severity
+    from: Time
+    to: Time
+    limit: Int
+    offset: Int
+  ): IncidentPage!
+  incident(id: ID!): Incident
+  team(id: ID!): Team
+  analytics(teamId: ID, from: Time, to: Time): Analytics!
+  runbooks(teamId: ID, query: String): [Runbook!]!
+}
+
+type Mutation {
+  acknowledgeIncident(id: ID!, message: String): Incident!
+  investigateIncident(id: ID!, message: String): Incident!
+  resolveIncident(id: ID!, summary: String): Incident!
+  createTeam(name: String!): Team!
+  inviteMember(teamId: ID!, email: String!, role: Role!): User!
+  removeMember(teamId: ID!, userId: ID!): Boolean!
+  updateSchedule(teamId: ID!, rotation: [ID!]!, intervalDays: Int!): OnCallSchedule!
+  addOverride(
+    teamId: ID!
+    userId: ID!
+    startsAt: Time!
+    endsAt: Time!
+    reason: String!
+  ): ScheduleOverride!
+  upsertRunbook(
+    id: ID
+    teamId: ID!
+    title: String!
+    content: String!
+    tags: [String!]!
+  ): Runbook!
+  createPostmortem(
+    incidentId: ID!
+    summary: String!
+    timeline: String!
+    actionItems: [String!]!
+  ): Postmortem!
+  rotateApiKey(teamId: ID!): String!
+}
+
+type Subscription {
+  incidentFeed(teamId: ID!, severity: Severity, status: IncidentStatus): IncidentEvent!
+  onCallStatus(teamId: ID!): OnCallStatusEvent!
+}
