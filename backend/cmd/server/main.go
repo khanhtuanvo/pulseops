@@ -10,8 +10,12 @@ import (
 	"time"
 
 	"github.com/tuankhanhvo/pulseops/internal/server"
+	"github.com/tuankhanhvo/pulseops/internal/streams"
 	"github.com/tuankhanhvo/pulseops/pkg/config"
 	"github.com/tuankhanhvo/pulseops/pkg/mongodb"
+	"github.com/tuankhanhvo/pulseops/pkg/observability"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +32,22 @@ func main() {
 
 	logger.Info("config loaded", zap.String("env", cfg.Env), zap.String("port", cfg.Port))
 
-	db, err := mongodb.Connect(cfg.MongoURI, cfg.MongoDB)
+	appCtx, stopApp := context.WithCancel(context.Background())
+	defer stopApp()
+
+	shutdownTracing, err := observability.InitTracing(appCtx, cfg, logger)
+	if err != nil {
+		logger.Fatal("init opentelemetry tracing", zap.Error(err))
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracing(shutdownCtx); err != nil {
+			logger.Error("shutdown opentelemetry tracing", zap.Error(err))
+		}
+	}()
+
+	db, err := mongodb.Connect(cfg.MongoURI, cfg.MongoDB, otelmongo.NewMonitor())
 	if err != nil {
 		logger.Fatal("connect mongodb", zap.Error(err))
 	}
@@ -39,9 +58,13 @@ func main() {
 	}
 	logger.Info("mongodb indexes ready")
 
+	hub := streams.NewHub()
+	go streams.StartChangeStreamListener(appCtx, db, hub, logger)
+
+	router := server.NewRouter(&cfg, db, logger, hub)
 	httpServer := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      server.NewRouter(cfg, db, logger),
+		Handler:      otelhttp.NewHandler(router, cfg.ServiceName),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -65,6 +88,7 @@ func main() {
 		logger.Info("shutdown signal received", zap.String("signal", signal.String()))
 	}
 
+	stopApp()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

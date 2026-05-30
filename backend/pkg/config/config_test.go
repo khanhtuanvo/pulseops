@@ -18,6 +18,8 @@ func TestLoad(t *testing.T) {
 	t.Setenv("GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com")
 	t.Setenv("GOOGLE_CLIENT_SECRET", "client-secret")
 	t.Setenv("OAUTH_REDIRECT_URL", "http://localhost:8080/auth/callback")
+	t.Setenv("OTEL_SERVICE_NAME", "pulseops-api-test")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://example.monitor.azure.com")
 
 	cfg := Load()
 
@@ -32,4 +34,6 @@ func TestLoad(t *testing.T) {
 	require.Equal(t, "client-id.apps.googleusercontent.com", cfg.GoogleClientID)
 	require.Equal(t, "client-secret", cfg.GoogleClientSecret)
 	require.Equal(t, "http://localhost:8080/auth/callback", cfg.OAuthRedirectURL)
+	require.Equal(t, "pulseops-api-test", cfg.ServiceName)
+	require.Equal(t, "https://example.monitor.azure.com", cfg.OTLPEndpoint)
 }

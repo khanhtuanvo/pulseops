@@ -14,6 +14,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
       '/auth': 'http://localhost:8080',
+      '/query': 'http://localhost:8080',
     },
   },
 });

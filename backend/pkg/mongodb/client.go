@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -14,11 +15,16 @@ var pingClient = func(ctx context.Context, client *mongo.Client) error {
 	return client.Ping(ctx, readpref.Primary())
 }
 
-func Connect(uri, dbName string) (*mongo.Database, error) {
+func Connect(uri, dbName string, monitors ...*event.CommandMonitor) (*mongo.Database, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	clientOptions := options.Client().ApplyURI(uri)
+	if len(monitors) > 0 && monitors[0] != nil {
+		clientOptions.SetMonitor(monitors[0])
+	}
+
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		return nil, err
 	}

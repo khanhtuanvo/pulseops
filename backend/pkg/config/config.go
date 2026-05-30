@@ -18,6 +18,8 @@ type Config struct {
 	GoogleClientID         string
 	GoogleClientSecret     string
 	OAuthRedirectURL       string
+	ServiceName            string
+	OTLPEndpoint           string
 }
 
 func Load() Config {
@@ -33,6 +35,8 @@ func Load() Config {
 		GoogleClientID:         mustEnv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret:     mustEnv("GOOGLE_CLIENT_SECRET"),
 		OAuthRedirectURL:       mustEnv("OAUTH_REDIRECT_URL"),
+		ServiceName:            getEnv("OTEL_SERVICE_NAME", "pulseops-api"),
+		OTLPEndpoint:           getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 	}
 }
 

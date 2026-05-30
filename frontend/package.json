@@ -8,7 +8,7 @@
     "build": "vue-tsc && vite build",
     "type-check": "vue-tsc --noEmit",
     "lint": "eslint src/ --ext .ts,.vue",
-    "test:unit": "vitest run --passWithNoTests"
+    "test:unit": "vitest run --passWithNoTests --maxWorkers=1 --minWorkers=1 --no-file-parallelism"
   },
   "dependencies": {
     "@apollo/client": "^3.13.9",

@@ -6,124 +6,576 @@ package graph
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"time"
 
 	"github.com/tuankhanhvo/pulseops/graph/generated"
 	"github.com/tuankhanhvo/pulseops/graph/model"
+	"github.com/tuankhanhvo/pulseops/internal/analytics"
+	"github.com/tuankhanhvo/pulseops/internal/incidents"
+	"github.com/tuankhanhvo/pulseops/internal/oncall"
+	"github.com/tuankhanhvo/pulseops/internal/streams"
+	"github.com/tuankhanhvo/pulseops/pkg/auth"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // AcknowledgeIncident is the resolver for the acknowledgeIncident field.
 func (r *mutationResolver) AcknowledgeIncident(ctx context.Context, id string, message *string) (*model.Incident, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	incident, err := r.IncidentService.Acknowledge(ctx, id, claims, stringValue(message))
+	if err != nil {
+		return nil, err
+	}
+	r.publishIncidentEvent("INCIDENT_ACKNOWLEDGED", incident)
+
+	return MapIncidentDoc(incident), nil
 }
 
 // InvestigateIncident is the resolver for the investigateIncident field.
 func (r *mutationResolver) InvestigateIncident(ctx context.Context, id string, message *string) (*model.Incident, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	incident, err := r.IncidentService.Investigate(ctx, id, claims, stringValue(message))
+	if err != nil {
+		return nil, err
+	}
+	r.publishIncidentEvent("INCIDENT_INVESTIGATING", incident)
+
+	return MapIncidentDoc(incident), nil
 }
 
 // ResolveIncident is the resolver for the resolveIncident field.
 func (r *mutationResolver) ResolveIncident(ctx context.Context, id string, summary *string) (*model.Incident, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	incident, err := r.IncidentService.Resolve(ctx, id, claims, stringValue(summary))
+	if err != nil {
+		return nil, err
+	}
+	r.publishIncidentEvent("INCIDENT_RESOLVED", incident)
+
+	return MapIncidentDoc(incident), nil
 }
 
 // CreateTeam is the resolver for the createTeam field.
 func (r *mutationResolver) CreateTeam(ctx context.Context, name string) (*model.Team, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := requireOwner(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ownerID, err := primitive.ObjectIDFromHex(claims.UserID)
+	if err != nil {
+		return nil, err
+	}
+	apiKey, hash, hint, err := newAPIKey()
+	if err != nil {
+		return nil, err
+	}
+
+	team, err := r.TeamRepo.CreateTeam(ctx, incidents.TeamDoc{
+		Name:       name,
+		APIKeyHash: hash,
+		APIKeyHint: hint,
+		OwnerID:    ownerID,
+		CreatedAt:  time.Now().UTC(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	modelTeam := MapTeamDoc(team, nil, nil)
+	modelTeam.APIKeyHint = stringPointer("New API key, shown once: " + apiKey)
+	return modelTeam, nil
 }
 
 // InviteMember is the resolver for the inviteMember field.
 func (r *mutationResolver) InviteMember(ctx context.Context, teamID string, email string, role model.Role) (*model.User, error) {
-	// TODO: implement.
-	return nil, nil
+	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return nil, err
+	}
+
+	user, err := r.TeamRepo.FindUserByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, auth.ErrUnauthorized
+	}
+	if err := r.TeamRepo.MoveUserToTeam(ctx, user.ID.Hex(), teamID, string(role)); err != nil {
+		return nil, err
+	}
+
+	updated, err := r.TeamRepo.FindUserByID(ctx, user.ID.Hex(), teamID)
+	if err != nil {
+		return nil, err
+	}
+
+	return MapUserDoc(updated), nil
 }
 
 // RemoveMember is the resolver for the removeMember field.
 func (r *mutationResolver) RemoveMember(ctx context.Context, teamID string, userID string) (bool, error) {
-	// TODO: implement.
-	return false, nil
+	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return false, err
+	}
+
+	members, err := r.TeamRepo.ListTeamMembers(ctx, teamID)
+	if err != nil {
+		return false, err
+	}
+	ownerCount := 0
+	removingOwner := false
+	for _, member := range members {
+		if member.Role == "OWNER" {
+			ownerCount++
+			if member.ID.Hex() == userID {
+				removingOwner = true
+			}
+		}
+	}
+	if removingOwner && ownerCount <= 1 {
+		return false, auth.ErrUnauthorized
+	}
+
+	if err := r.TeamRepo.RemoveUserFromTeam(ctx, userID, teamID); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // UpdateSchedule is the resolver for the updateSchedule field.
 func (r *mutationResolver) UpdateSchedule(ctx context.Context, teamID string, rotation []string, intervalDays int) (*model.OnCallSchedule, error) {
-	// TODO: implement.
-	return nil, nil
+	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return nil, err
+	}
+	if intervalDays <= 0 {
+		return nil, oncall.ErrInvalidInterval
+	}
+
+	teamObjectID, userIDs, err := parseTeamAndUserIDs(teamID, rotation)
+	if err != nil {
+		return nil, err
+	}
+	for _, userID := range rotation {
+		user, err := r.TeamRepo.FindUserByID(ctx, userID, teamID)
+		if err != nil {
+			return nil, err
+		}
+		if user == nil {
+			return nil, auth.ErrUnauthorized
+		}
+	}
+
+	schedule, err := oncall.UpsertSchedule(ctx, r.DB, incidents.OnCallScheduleDoc{
+		TeamID:       teamObjectID,
+		Rotation:     userIDs,
+		IntervalDays: intervalDays,
+		CycleStart:   time.Now().UTC(),
+		Overrides:    []incidents.OverrideDoc{},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return r.mapSchedule(ctx, schedule)
 }
 
 // AddOverride is the resolver for the addOverride field.
 func (r *mutationResolver) AddOverride(ctx context.Context, teamID string, userID string, startsAt time.Time, endsAt time.Time, reason string) (*model.ScheduleOverride, error) {
-	// TODO: implement.
-	return nil, nil
+	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return nil, err
+	}
+
+	user, err := r.TeamRepo.FindUserByID(ctx, userID, teamID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, auth.ErrUnauthorized
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+	override := oncall.ScheduleOverride{
+		ID:       primitive.NewObjectID(),
+		UserID:   userObjectID,
+		StartsAt: startsAt,
+		EndsAt:   endsAt,
+		Reason:   reason,
+	}
+	if err := oncall.AddOverride(ctx, r.DB, teamID, override); err != nil {
+		return nil, err
+	}
+
+	return &model.ScheduleOverride{
+		ID:       override.ID.Hex(),
+		User:     MapUserDoc(user),
+		StartsAt: startsAt,
+		EndsAt:   endsAt,
+		Reason:   reason,
+	}, nil
 }
 
 // UpsertRunbook is the resolver for the upsertRunbook field.
 func (r *mutationResolver) UpsertRunbook(ctx context.Context, id *string, teamID string, title string, content string, tags []string) (*model.Runbook, error) {
-	// TODO: implement.
-	return nil, nil
+	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return nil, err
+	}
+
+	teamObjectID, err := primitive.ObjectIDFromHex(teamID)
+	if err != nil {
+		return nil, err
+	}
+
+	doc := incidents.RunbookDoc{
+		TeamID:  teamObjectID,
+		Title:   title,
+		Content: content,
+		Tags:    tags,
+	}
+	if id != nil && *id != "" {
+		runbookID, err := primitive.ObjectIDFromHex(*id)
+		if err != nil {
+			return nil, err
+		}
+		doc.ID = runbookID
+	}
+
+	runbook, err := r.RunbookRepo.Upsert(ctx, doc)
+	if err != nil {
+		return nil, err
+	}
+	if runbook == nil {
+		return nil, errors.New("runbook not found")
+	}
+
+	return MapRunbookDoc(runbook), nil
 }
 
 // CreatePostmortem is the resolver for the createPostmortem field.
 func (r *mutationResolver) CreatePostmortem(ctx context.Context, incidentID string, summary string, timeline string, actionItems []string) (*model.Postmortem, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireRole(ctx, "OWNER", "RESPONDER")
+	if err != nil {
+		return nil, err
+	}
+
+	incident, err := r.IncidentRepo.GetByID(ctx, incidentID, claims.TeamID)
+	if err != nil {
+		return nil, err
+	}
+	if incident == nil {
+		return nil, auth.ErrUnauthorized
+	}
+
+	incidentObjectID, err := primitive.ObjectIDFromHex(incidentID)
+	if err != nil {
+		return nil, err
+	}
+	authorID, err := primitive.ObjectIDFromHex(claims.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	postmortem := incidents.PostmortemDoc{
+		ID:          primitive.NewObjectID(),
+		IncidentID:  incidentObjectID,
+		AuthorID:    authorID,
+		Summary:     summary,
+		Timeline:    timeline,
+		ActionItems: actionItems,
+		CreatedAt:   time.Now().UTC(),
+	}
+	if _, err := r.DB.Collection("postmortems").InsertOne(ctx, postmortem); err != nil {
+		return nil, err
+	}
+
+	return MapPostmortemDoc(&postmortem), nil
 }
 
 // RotateAPIKey is the resolver for the rotateApiKey field.
 func (r *mutationResolver) RotateAPIKey(ctx context.Context, teamID string) (string, error) {
-	// TODO: implement.
-	return "", nil
+	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return "", err
+	}
+
+	apiKey, hash, hint, err := newAPIKey()
+	if err != nil {
+		return "", err
+	}
+	if err := r.TeamRepo.RotateAPIKey(ctx, teamID, hash, hint); err != nil {
+		return "", err
+	}
+
+	return apiKey, nil
 }
 
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := r.TeamRepo.FindUserByID(ctx, claims.UserID, claims.TeamID)
+	if err != nil {
+		return nil, err
+	}
+
+	return MapUserDoc(user), nil
 }
 
 // Incidents is the resolver for the incidents field.
 func (r *queryResolver) Incidents(ctx context.Context, teamID *string, status *model.IncidentStatus, severity *model.Severity, from *time.Time, to *time.Time, limit *int, offset *int) (*model.IncidentPage, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if teamID != nil && *teamID != claims.TeamID {
+		return nil, auth.ErrUnauthorized
+	}
+
+	filters := incidents.ListFilters{
+		Status:   enumString(status),
+		Severity: enumString(severity),
+		From:     from,
+		To:       to,
+	}
+	if limit != nil {
+		filters.Limit = *limit
+	}
+	if offset != nil {
+		filters.Offset = *offset
+	}
+
+	docs, total, err := r.IncidentRepo.List(ctx, claims.TeamID, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	hasMore := false
+	if filters.Limit > 0 {
+		hasMore = int64(filters.Offset+filters.Limit) < total
+	}
+
+	return &model.IncidentPage{
+		Items:      MapIncidentDocs(docs),
+		TotalCount: int(total),
+		HasMore:    hasMore,
+	}, nil
 }
 
 // Incident is the resolver for the incident field.
 func (r *queryResolver) Incident(ctx context.Context, id string) (*model.Incident, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	incident, err := r.IncidentRepo.GetByID(ctx, id, claims.TeamID)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.hydrateIncident(ctx, incident)
 }
 
 // Team is the resolver for the team field.
 func (r *queryResolver) Team(ctx context.Context, id string) (*model.Team, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if claims.TeamID != id {
+		return nil, auth.ErrUnauthorized
+	}
+
+	team, err := r.TeamRepo.FindTeamByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if team == nil {
+		return nil, nil
+	}
+	members, err := r.TeamRepo.ListTeamMembers(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	schedule, err := oncall.FindScheduleByTeamID(ctx, r.DB, id)
+	if err != nil {
+		return nil, err
+	}
+	scheduleModel, err := r.mapSchedule(ctx, schedule)
+	if err != nil {
+		return nil, err
+	}
+
+	return MapTeamDoc(team, members, scheduleModel), nil
 }
 
 // Analytics is the resolver for the analytics field.
 func (r *queryResolver) Analytics(ctx context.Context, teamID *string, from *time.Time, to *time.Time) (*model.Analytics, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedTeamID := claims.TeamID
+	if teamID != nil {
+		if *teamID != claims.TeamID {
+			return nil, auth.ErrUnauthorized
+		}
+		resolvedTeamID = *teamID
+	}
+
+	end := time.Now().UTC()
+	if to != nil {
+		end = *to
+	}
+	start := end.AddDate(0, 0, -30)
+	if from != nil {
+		start = *from
+	}
+
+	result, err := analytics.ComputeAnalytics(ctx, r.DB, resolvedTeamID, start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	return MapAnalyticsResult(result), nil
 }
 
 // Runbooks is the resolver for the runbooks field.
 func (r *queryResolver) Runbooks(ctx context.Context, teamID *string, query *string) ([]*model.Runbook, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedTeamID := claims.TeamID
+	if teamID != nil {
+		if *teamID != claims.TeamID {
+			return nil, auth.ErrUnauthorized
+		}
+		resolvedTeamID = *teamID
+	}
+
+	search := ""
+	if query != nil {
+		search = *query
+	}
+
+	runbooks, err := r.RunbookRepo.List(ctx, resolvedTeamID, search)
+	if err != nil {
+		return nil, err
+	}
+
+	return MapRunbookDocs(runbooks), nil
 }
 
 // IncidentFeed is the resolver for the incidentFeed field.
 func (r *subscriptionResolver) IncidentFeed(ctx context.Context, teamID string, severity *model.Severity, status *model.IncidentStatus) (<-chan *model.IncidentEvent, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if claims.TeamID != teamID {
+		return nil, auth.ErrUnauthorized
+	}
+	if r.Hub == nil {
+		return nil, errors.New("subscription hub is not configured")
+	}
+
+	subscriber := r.Hub.Subscribe(teamID)
+	out := make(chan *model.IncidentEvent, 16)
+
+	go func() {
+		<-ctx.Done()
+		r.Hub.Unsubscribe(teamID, subscriber)
+	}()
+
+	go func() {
+		defer close(out)
+		for event := range subscriber {
+			mapped, ok := mapIncidentEvent(event)
+			if !ok {
+				continue
+			}
+			if severity != nil && mapped.Incident.Severity != *severity {
+				continue
+			}
+			if status != nil && mapped.Incident.Status != *status {
+				continue
+			}
+
+			select {
+			case out <- mapped:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return out, nil
 }
 
 // OnCallStatus is the resolver for the onCallStatus field.
 func (r *subscriptionResolver) OnCallStatus(ctx context.Context, teamID string) (<-chan *model.OnCallStatusEvent, error) {
-	// TODO: implement.
-	return nil, nil
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if claims.TeamID != teamID {
+		return nil, auth.ErrUnauthorized
+	}
+
+	out := make(chan *model.OnCallStatusEvent, 1)
+	go func() {
+		close(out)
+		for {
+			event, err := r.onCallStatusEvent(ctx, teamID, time.Now().UTC())
+			if err != nil {
+				return
+			}
+
+			select {
+			case out <- event:
+			case <-ctx.Done():
+				return
+			}
+
+			wait := time.Until(event.HandoffAt)
+			if wait <= 0 {
+				wait = time.Minute
+			}
+			timer := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		}
+	}()
+
+	return out, nil
 }
 
 // Mutation returns generated.MutationResolver implementation.
@@ -138,3 +590,201 @@ func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subsc
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
+
+func (r *Resolver) publishIncidentEvent(eventType string, incident *incidents.IncidentDoc) {
+	if r.Hub == nil || incident == nil {
+		return
+	}
+
+	r.Hub.Publish(streams.IncidentEvent{
+		Type:       eventType,
+		IncidentID: incident.ID.Hex(),
+		TeamID:     incident.TeamID.Hex(),
+		Payload:    incident,
+	})
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
+}
+
+func enumString[T ~string](value *T) *string {
+	if value == nil {
+		return nil
+	}
+
+	stringValue := string(*value)
+	return &stringValue
+}
+
+func requireOwner(ctx context.Context) (*auth.Claims, error) {
+	claims, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if claims.Role != "OWNER" {
+		return nil, auth.ErrUnauthorized
+	}
+
+	return claims, nil
+}
+
+func requireOwnerForTeam(ctx context.Context, teamID string) error {
+	claims, err := requireOwner(ctx)
+	if err != nil {
+		return err
+	}
+	if claims.TeamID != teamID {
+		return auth.ErrUnauthorized
+	}
+
+	return nil
+}
+
+func newAPIKey() (string, string, string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", "", "", err
+	}
+
+	apiKey := hex.EncodeToString(raw)
+	sum := sha256.Sum256([]byte(apiKey))
+	return apiKey, hex.EncodeToString(sum[:]), apiKey[len(apiKey)-4:], nil
+}
+
+func parseTeamAndUserIDs(teamID string, userIDs []string) (primitive.ObjectID, []primitive.ObjectID, error) {
+	teamObjectID, err := primitive.ObjectIDFromHex(teamID)
+	if err != nil {
+		return primitive.NilObjectID, nil, err
+	}
+
+	parsed := make([]primitive.ObjectID, 0, len(userIDs))
+	for _, userID := range userIDs {
+		userObjectID, err := primitive.ObjectIDFromHex(userID)
+		if err != nil {
+			return primitive.NilObjectID, nil, err
+		}
+		parsed = append(parsed, userObjectID)
+	}
+
+	return teamObjectID, parsed, nil
+}
+
+func (r *Resolver) mapSchedule(ctx context.Context, schedule *incidents.OnCallScheduleDoc) (*model.OnCallSchedule, error) {
+	if schedule == nil {
+		return nil, nil
+	}
+
+	current, err := oncall.CurrentOnCall(*schedule, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	user, err := r.TeamRepo.FindUserByID(ctx, current.ID.Hex(), schedule.TeamID.Hex())
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		user = current
+	}
+
+	return MapOnCallScheduleDoc(schedule, user), nil
+}
+
+func (r *Resolver) hydrateIncident(ctx context.Context, doc *incidents.IncidentDoc) (*model.Incident, error) {
+	incident := MapIncidentDoc(doc)
+	if incident == nil {
+		return nil, nil
+	}
+
+	if doc.AcknowledgedBy != nil {
+		user, err := r.TeamRepo.FindUserByID(ctx, doc.AcknowledgedBy.Hex(), doc.TeamID.Hex())
+		if err != nil {
+			return nil, err
+		}
+		incident.AcknowledgedBy = MapUserDoc(user)
+	}
+	if doc.ResolvedBy != nil {
+		user, err := r.TeamRepo.FindUserByID(ctx, doc.ResolvedBy.Hex(), doc.TeamID.Hex())
+		if err != nil {
+			return nil, err
+		}
+		incident.ResolvedBy = MapUserDoc(user)
+	}
+	if doc.AssigneeID != nil {
+		user, err := r.TeamRepo.FindUserByID(ctx, doc.AssigneeID.Hex(), doc.TeamID.Hex())
+		if err != nil {
+			return nil, err
+		}
+		incident.Assignee = MapUserDoc(user)
+	}
+	if doc.RunbookID != nil {
+		runbook, err := r.RunbookRepo.GetByID(ctx, doc.RunbookID.Hex(), doc.TeamID.Hex())
+		if err != nil {
+			return nil, err
+		}
+		incident.Runbook = MapRunbookDoc(runbook)
+	}
+
+	cursor, err := r.DB.Collection("alerts").Find(ctx, bson.M{"incidentId": doc.ID, "teamId": doc.TeamID})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var alerts []*incidents.AlertDoc
+	if err := cursor.All(ctx, &alerts); err != nil {
+		return nil, err
+	}
+	incident.Alerts = MapAlertDocs(alerts)
+
+	return incident, nil
+}
+
+func (r *Resolver) onCallStatusEvent(ctx context.Context, teamID string, at time.Time) (*model.OnCallStatusEvent, error) {
+	schedule, err := oncall.FindScheduleByTeamID(ctx, r.DB, teamID)
+	if err != nil {
+		return nil, err
+	}
+	if schedule == nil {
+		return nil, errors.New("on-call schedule is not configured")
+	}
+
+	current, err := oncall.CurrentOnCall(*schedule, at)
+	if err != nil {
+		return nil, err
+	}
+	next, err := oncall.NextOnCall(*schedule, at)
+	if err != nil {
+		return nil, err
+	}
+
+	currentUser, err := r.TeamRepo.FindUserByID(ctx, current.ID.Hex(), teamID)
+	if err != nil {
+		return nil, err
+	}
+	if currentUser == nil {
+		currentUser = current
+	}
+	nextUser, err := r.TeamRepo.FindUserByID(ctx, next.ID.Hex(), teamID)
+	if err != nil {
+		return nil, err
+	}
+	if nextUser == nil {
+		nextUser = next
+	}
+
+	return &model.OnCallStatusEvent{
+		TeamID:        teamID,
+		CurrentOnCall: MapUserDoc(currentUser),
+		NextOnCall:    MapUserDoc(nextUser),
+		HandoffAt:     oncall.NextHandoffAt(*schedule, at),
+	}, nil
+}
+
+func stringPointer(value string) *string {
+	return &value
+}
