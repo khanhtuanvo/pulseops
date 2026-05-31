@@ -31,12 +31,27 @@ onMounted(async () => {
 <template>
   <main class="grid min-h-screen place-items-center bg-zinc-950 px-6 text-zinc-50">
     <section class="w-full max-w-sm text-center">
-      <div v-if="loading" class="mx-auto size-10 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent" />
-      <p v-if="loading" class="mt-4 text-sm text-zinc-300">Completing sign in...</p>
+      <div
+        v-if="loading"
+        class="mx-auto size-10 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent"
+      />
+      <p
+        v-if="loading"
+        class="mt-4 text-sm text-zinc-300"
+      >
+        Completing sign in...
+      </p>
       <template v-else-if="error">
-        <h1 class="text-2xl font-semibold">Could not sign in</h1>
-        <p class="mt-3 text-sm text-red-200">{{ error }}</p>
-        <RouterLink class="mt-6 inline-flex rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950" to="/login">
+        <h1 class="text-2xl font-semibold">
+          Could not sign in
+        </h1>
+        <p class="mt-3 text-sm text-red-200">
+          {{ error }}
+        </p>
+        <RouterLink
+          class="mt-6 inline-flex rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950"
+          to="/login"
+        >
           Try again
         </RouterLink>
       </template>

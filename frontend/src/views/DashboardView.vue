@@ -47,12 +47,20 @@ onMounted(async () => {
     <nav class="border-b border-zinc-800 bg-zinc-950/95">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <div>
-          <p class="text-sm font-semibold text-cyan-300">PulseOps</p>
-          <h1 class="text-xl font-semibold">Incident dashboard</h1>
+          <p class="text-sm font-semibold text-cyan-300">
+            PulseOps
+          </p>
+          <h1 class="text-xl font-semibold">
+            Incident dashboard
+          </h1>
         </div>
         <div class="flex items-center gap-4 text-sm">
           <span class="text-zinc-300">{{ authStore.user?.name }}</span>
-          <button class="rounded-md border border-zinc-700 px-3 py-2 text-zinc-200 hover:bg-zinc-900" type="button" @click="authStore.logout">
+          <button
+            class="rounded-md border border-zinc-700 px-3 py-2 text-zinc-200 hover:bg-zinc-900"
+            type="button"
+            @click="authStore.logout"
+          >
             Logout
           </button>
         </div>
@@ -62,19 +70,32 @@ onMounted(async () => {
     <div class="mx-auto grid max-w-7xl gap-6 px-6 py-6">
       <section class="grid gap-4 md:grid-cols-3">
         <div class="rounded-md border border-zinc-800 bg-zinc-950 p-4">
-          <p class="text-xs text-zinc-500">Connection</p>
+          <p class="text-xs text-zinc-500">
+            Connection
+          </p>
           <p class="mt-2 flex items-center gap-2 text-sm">
-            <span class="size-2 rounded-full" :class="feed.isConnected.value ? 'bg-emerald-400' : 'bg-red-400'" />
+            <span
+              class="size-2 rounded-full"
+              :class="feed.isConnected.value ? 'bg-emerald-400' : 'bg-red-400'"
+            />
             {{ feed.isConnected.value ? 'Connected' : `Reconnecting (${feed.reconnectCount.value})` }}
           </p>
         </div>
         <div class="rounded-md border border-zinc-800 bg-zinc-950 p-4">
-          <p class="text-xs text-zinc-500">Triggered</p>
-          <p class="mt-2 text-2xl font-semibold">{{ triggeredCount }}</p>
+          <p class="text-xs text-zinc-500">
+            Triggered
+          </p>
+          <p class="mt-2 text-2xl font-semibold">
+            {{ triggeredCount }}
+          </p>
         </div>
         <div class="rounded-md border border-zinc-800 bg-zinc-950 p-4">
-          <p class="text-xs text-zinc-500">Current on-call</p>
-          <p class="mt-2 text-sm text-zinc-200">{{ authStore.user?.name ?? 'Unknown' }}</p>
+          <p class="text-xs text-zinc-500">
+            Current on-call
+          </p>
+          <p class="mt-2 text-sm text-zinc-200">
+            {{ authStore.user?.name ?? 'Unknown' }}
+          </p>
         </div>
       </section>
 
@@ -88,22 +109,51 @@ onMounted(async () => {
 
       <section class="grid gap-4">
         <div class="flex flex-wrap gap-3">
-          <select v-model="statusFilter" class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm">
-            <option value="">All statuses</option>
-            <option value="TRIGGERED">Triggered</option>
-            <option value="ACKNOWLEDGED">Acknowledged</option>
-            <option value="INVESTIGATING">Investigating</option>
-            <option value="RESOLVED">Resolved</option>
+          <select
+            v-model="statusFilter"
+            class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+          >
+            <option value="">
+              All statuses
+            </option>
+            <option value="TRIGGERED">
+              Triggered
+            </option>
+            <option value="ACKNOWLEDGED">
+              Acknowledged
+            </option>
+            <option value="INVESTIGATING">
+              Investigating
+            </option>
+            <option value="RESOLVED">
+              Resolved
+            </option>
           </select>
-          <select v-model="severityFilter" class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm">
-            <option value="">All severities</option>
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
+          <select
+            v-model="severityFilter"
+            class="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+          >
+            <option value="">
+              All severities
+            </option>
+            <option value="CRITICAL">
+              Critical
+            </option>
+            <option value="HIGH">
+              High
+            </option>
+            <option value="MEDIUM">
+              Medium
+            </option>
+            <option value="LOW">
+              Low
+            </option>
           </select>
         </div>
-        <div ref="feedElement" class="max-h-[58vh] overflow-y-auto pr-1">
+        <div
+          ref="feedElement"
+          class="max-h-[58vh] overflow-y-auto pr-1"
+        >
           <IncidentFeed :incidents="filteredIncidents" />
         </div>
       </section>

@@ -8,9 +8,16 @@ defineProps<{ incidents: Incident[] }>();
 <template>
   <div class="space-y-3">
     <TransitionGroup name="incident">
-      <IncidentCard v-for="incident in incidents" :key="incident.id" :incident="incident" />
+      <IncidentCard
+        v-for="incident in incidents"
+        :key="incident.id"
+        :incident="incident"
+      />
     </TransitionGroup>
-    <p v-if="incidents.length === 0" class="rounded-md border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+    <p
+      v-if="incidents.length === 0"
+      class="rounded-md border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500"
+    >
       No incidents match the current filters.
     </p>
   </div>

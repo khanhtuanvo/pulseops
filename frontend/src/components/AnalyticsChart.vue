@@ -73,8 +73,12 @@ onMounted(loadAnalytics);
     <div class="rounded-md border border-zinc-800 bg-zinc-950 p-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-sm font-semibold text-zinc-100">Incident trend</h2>
-          <p class="text-xs text-zinc-500">MTTR {{ Math.round((analytics?.mttrSeconds ?? 0) / 60) }}m</p>
+          <h2 class="text-sm font-semibold text-zinc-100">
+            Incident trend
+          </h2>
+          <p class="text-xs text-zinc-500">
+            MTTR {{ Math.round((analytics?.mttrSeconds ?? 0) / 60) }}m
+          </p>
         </div>
         <div class="flex rounded-md border border-zinc-800 p-1 text-xs">
           <button
@@ -89,11 +93,21 @@ onMounted(loadAnalytics);
           </button>
         </div>
       </div>
-      <Line :data="lineData" :options="{ responsive: true, maintainAspectRatio: false }" class="h-64" />
+      <Line
+        :data="lineData"
+        :options="{ responsive: true, maintainAspectRatio: false }"
+        class="h-64"
+      />
     </div>
     <div class="rounded-md border border-zinc-800 bg-zinc-950 p-4">
-      <h2 class="mb-4 text-sm font-semibold text-zinc-100">Severity mix</h2>
-      <Doughnut :data="doughnutData" :options="{ responsive: true, maintainAspectRatio: false }" class="h-64" />
+      <h2 class="mb-4 text-sm font-semibold text-zinc-100">
+        Severity mix
+      </h2>
+      <Doughnut
+        :data="doughnutData"
+        :options="{ responsive: true, maintainAspectRatio: false }"
+        class="h-64"
+      />
     </div>
   </section>
 </template>
