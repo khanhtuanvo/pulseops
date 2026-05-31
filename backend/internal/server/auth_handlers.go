@@ -192,6 +192,10 @@ func (h *AuthHandlers) Me(w http.ResponseWriter, r *http.Request) {
 	user, err := h.findUserByID(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
+			if user, ok := e2eUserFromClaims(*claims); ok {
+				writeJSON(w, http.StatusOK, user)
+				return
+			}
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

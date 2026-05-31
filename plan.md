@@ -25,46 +25,46 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 | 2.2 | MongoDB client and connection | [x] |
 | 2.3 | MongoDB indexes at startup | [x] |
 | 2.4 | Wire main.go with config, MongoDB, graceful shutdown | [x] |
-| 3.1 | GraphQL schema SDL | [ ] |
-| 3.2 | Configure gqlgen and generate Go code | [ ] |
-| 3.3 | Stub resolvers for all queries and mutations | [ ] |
-| 4.1 | JWT signing and validation | [ ] |
-| 4.2 | Auth middleware | [ ] |
-| 4.3 | Google OAuth flow | [ ] |
-| 4.4 | Auth HTTP handlers | [ ] |
-| 5.1 | HTTP router with all middleware | [ ] |
-| 5.2 | MongoDB document models in Go | [ ] |
-| 5.3 | Alert fingerprint engine | [ ] |
-| 5.4 | Alert webhook handler | [ ] |
-| 6.1 | Subscription Hub | [ ] |
-| 6.2 | MongoDB Change Stream listener | [ ] |
-| 6.3 | Wire subscriptions into GraphQL resolver | [ ] |
-| 7.1 | Incidents repository | [ ] |
-| 7.2 | Incident state machine service | [ ] |
-| 7.3 | GraphQL resolvers for incidents | [ ] |
-| 8.1 | User and team repositories | [ ] |
-| 8.2 | On-call schedule logic | [ ] |
-| 8.3 | GraphQL resolvers for teams and on-call | [ ] |
-| 9.1 | Analytics aggregation | [ ] |
-| 9.2 | Runbook CRUD | [ ] |
-| 10.1 | Vue router with auth guards | [ ] |
-| 10.2 | Pinia auth store | [ ] |
-| 10.3 | useAuth composable (PKCE login flow) | [ ] |
-| 10.4 | LoginView and AuthCallback pages | [ ] |
-| 10.5 | Pinia incidents store | [ ] |
-| 10.6 | useIncidentFeed composable | [ ] |
-| 10.7 | DashboardView and IncidentFeed component | [ ] |
-| 10.8 | IncidentDetailView | [ ] |
-| 10.9 | MTTR analytics chart | [ ] |
-| 11.1 | Azure infrastructure provisioning script | [ ] |
-| 11.2 | Deployment workflows in GitHub Actions | [ ] |
-| 11.3 | Trivy container vulnerability scanning | [ ] |
-| 11.4 | Azure Key Vault secret injection | [ ] |
-| 12.1 | OpenTelemetry tracing | [ ] |
-| 12.2 | Structured request logging | [ ] |
-| 12.3 | Project README | [ ] |
+| 3.1 | GraphQL schema SDL | [x] |
+| 3.2 | Configure gqlgen and generate Go code | [x] |
+| 3.3 | Stub resolvers for all queries and mutations | [x] |
+| 4.1 | JWT signing and validation | [x] |
+| 4.2 | Auth middleware | [x] |
+| 4.3 | Google OAuth flow | [x] |
+| 4.4 | Auth HTTP handlers | [x] |
+| 5.1 | HTTP router with all middleware | [x] |
+| 5.2 | MongoDB document models in Go | [x] |
+| 5.3 | Alert fingerprint engine | [x] |
+| 5.4 | Alert webhook handler | [x] |
+| 6.1 | Subscription Hub | [x] |
+| 6.2 | MongoDB Change Stream listener | [x] |
+| 6.3 | Wire subscriptions into GraphQL resolver | [x] |
+| 7.1 | Incidents repository | [x] |
+| 7.2 | Incident state machine service | [x] |
+| 7.3 | GraphQL resolvers for incidents | [x] |
+| 8.1 | User and team repositories | [x] |
+| 8.2 | On-call schedule logic | [x] |
+| 8.3 | GraphQL resolvers for teams and on-call | [x] |
+| 9.1 | Analytics aggregation | [x] |
+| 9.2 | Runbook CRUD | [x] |
+| 10.1 | Vue router with auth guards | [x] |
+| 10.2 | Pinia auth store | [x] |
+| 10.3 | useAuth composable (PKCE login flow) | [x] |
+| 10.4 | LoginView and AuthCallback pages | [x] |
+| 10.5 | Pinia incidents store | [x] |
+| 10.6 | useIncidentFeed composable | [x] |
+| 10.7 | DashboardView and IncidentFeed component | [x] |
+| 10.8 | IncidentDetailView | [x] |
+| 10.9 | MTTR analytics chart | [x] |
+| 11.1 | Azure infrastructure provisioning script | [x] |
+| 11.2 | Deployment workflows in GitHub Actions | [x] |
+| 11.3 | Trivy container vulnerability scanning | [x] |
+| 11.4 | Azure Key Vault secret injection | [x] |
+| 12.1 | OpenTelemetry tracing | [x] |
+| 12.2 | Structured request logging | [x] |
+| 12.3 | Project README | [x] |
 | 12.4 | Demo recording and resume bullets | [ ] |
-| 13.1 | Set up Playwright for E2E testing | [ ] |
+| 13.1 | Set up Playwright for E2E testing | [x] |
 | 13.2 | E2E test: login flow | [ ] |
 | 13.3 | E2E test: real-time incident flow | [ ] |
 | 13.4 | Go integration tests for webhook pipeline | [ ] |
@@ -80,7 +80,7 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 | 15.5 | Interview preparation document | [ ] |
 | 15.6 | Final portfolio packaging | [ ] |
 
-**Current step: 3.1**
+**Current step: 13.2** — login-flow E2E tests are implemented; full pass needs Docker Desktop running for the Compose stack
 
 ---
 
@@ -1427,7 +1427,35 @@ Log at ERROR level with full context for:
 
 ---
 
-### STEP 12.3 — Write the projec
+### STEP 12.3 — Write the project README
+
+Rewrite `README.md` at the repository root as a complete technical document.
+
+Include these sections:
+
+**Overview** — 2-3 sentences describing what PulseOps is and who it is for
+
+**Architecture** — the system boundary diagram described as text with an ASCII representation of the data flow: `Alert Source → Go API → MongoDB → Change Stream → Hub → WebSocket → Vue Dashboard`
+
+**Tech stack** — table listing frontend, backend, database, cloud, and DevOps tools with one-line descriptions
+
+**Local development** — exact steps: prerequisites (Docker, Go 1.22, Node 20), clone, copy `.env.example`, fill in Google OAuth credentials, `docker-compose up`, verify health check
+
+**Design decisions** — a bullet list of intentional trade-offs:
+- MongoDB-only (no Redis): TTL indexes replace ephemeral cache; acceptable TTL precision at this scale
+- Go monolith (not microservices): single deployable unit reduces ops overhead; package separation maintains architectural clarity
+- Rule-based fingerprinting (not ML): deterministic, explainable, zero training data required
+- Single Container App instance (phase 1): WebSocket fan-out is in-process; Change Streams would serve as shared pub-sub at scale
+- OAuth PKCE (not DIY JWT login): industry standard, delegates credential security to Google
+
+**Known limitations** — honest list:
+- WebSocket subscriptions are not horizontally scalable without replacing the in-process Hub with a shared pub-sub (MongoDB Change Streams fan-out or Redis pub-sub)
+- Token revocation window: up to 15 minutes after a user is removed from a team, their existing JWT remains valid
+- MongoDB TTL cleanup granularity: 60-second background sweep (not millisecond precision)
+
+Commit with message `docs: write complete project README`.
+
+**Verification:** `README.md` renders correctly on GitHub. Architecture section is present. Local development steps work when followed from scratch on a clean machine.
 
 ### STEP 12.4 — Record the demo and write resume bullets
 

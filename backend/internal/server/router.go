@@ -64,7 +64,7 @@ func NewRouter(cfg *config.Config, db *mongo.Database, logger *zap.Logger, hub *
 	router.Use(cors.New(cors.Options{
 		AllowedOrigins:   splitOrigins(cfg.AllowedOrigins),
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions},
-		AllowedHeaders:   []string{"Content-Type", "Authorization", requestIDHeader, "X-API-Key"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", requestIDHeader, "X-API-Key", "X-E2E-Test-User"},
 		ExposedHeaders:   []string{requestIDHeader},
 		AllowCredentials: true,
 	}).Handler)

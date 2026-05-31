@@ -1,7 +1,7 @@
 import { fileURLToPath, URL } from 'node:url';
 
 import vue from '@vitejs/plugin-vue';
-import { defineConfig } from 'vite';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [vue()],
@@ -16,5 +16,8 @@ export default defineConfig({
       '/auth': 'http://localhost:8080',
       '/query': 'http://localhost:8080',
     },
+  },
+  test: {
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 });

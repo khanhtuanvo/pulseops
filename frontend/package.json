@@ -8,7 +8,9 @@
     "build": "vue-tsc && vite build",
     "type-check": "vue-tsc --noEmit",
     "lint": "eslint src/ --ext .ts,.vue",
-    "test:unit": "vitest run --passWithNoTests --maxWorkers=1 --minWorkers=1 --no-file-parallelism"
+    "test:unit": "vitest run --passWithNoTests --maxWorkers=1 --minWorkers=1 --no-file-parallelism",
+    "test:e2e": "playwright test --pass-with-no-tests",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@apollo/client": "^3.13.9",
@@ -26,6 +28,7 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
     "@typescript-eslint/parser": "^8.32.1",
     "@vue/test-utils": "^2.4.6",

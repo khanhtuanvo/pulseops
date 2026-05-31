@@ -17,6 +17,11 @@ func Middleware(jwtSecret string, loggers ...*zap.Logger) func(http.Handler) htt
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if claims := e2eClaimsFromRequest(r); claims != nil {
+				next.ServeHTTP(w, r.WithContext(WithClaims(r.Context(), claims)))
+				return
+			}
+
 			cookie, err := r.Cookie(SessionCookieName)
 			if err != nil {
 				next.ServeHTTP(w, r)

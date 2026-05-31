@@ -31,9 +31,12 @@ jobs:
         working-directory: backend
         run: go mod download
       - name: Lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          working-directory: backend
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/backend:/workspace" \
+            -w /workspace \
+            golangci/golangci-lint:v1.64.8 \
+            golangci-lint run ./...
       - name: Test
         working-directory: backend
         run: go test ./... -race -count=1
