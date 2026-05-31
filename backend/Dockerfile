@@ -12,9 +12,9 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/pulseops ./cmd/server
 
-FROM alpine:3.19 AS prod
+FROM gcr.io/distroless/static-debian12:nonroot AS prod
 
 WORKDIR /app
 COPY --from=build /out/pulseops /app/pulseops
 EXPOSE 8080
-CMD ["/app/pulseops"]
+ENTRYPOINT ["/app/pulseops"]

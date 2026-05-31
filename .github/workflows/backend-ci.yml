@@ -22,8 +22,8 @@ jobs:
   lint-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.23"
           cache-dependency-path: backend/go.sum
@@ -31,7 +31,7 @@ jobs:
         working-directory: backend
         run: go mod download
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           working-directory: backend
       - name: Test
@@ -42,14 +42,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-test
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
       - name: Build production image
         run: docker build --target prod -t pulseops-api:${{ github.sha }} backend
       - name: Save image for security scan
         run: docker save pulseops-api:${{ github.sha }} -o pulseops-api.tar
       - name: Upload image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pulseops-api-image
           path: pulseops-api.tar
@@ -60,7 +60,7 @@ jobs:
     needs: build-image
     steps:
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: pulseops-api-image
       - name: Load image
@@ -75,7 +75,7 @@ jobs:
           exit-code: "1"
       - name: Upload Trivy SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
 
@@ -88,14 +88,14 @@ jobs:
       CONTAINER_APP_NAME: pulseops-api
       IMAGE: pulseopsregistry.azurecr.io/pulseops-api:${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Azure login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       - name: Log in to Azure Container Registry
         run: az acr login --name pulseopsregistry
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build and push production image
         run: |
           docker build --target prod -t "$IMAGE" backend
