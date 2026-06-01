@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.23"
+          go-version: "1.25.10"
           cache-dependency-path: backend/go.sum
       - name: Download dependencies
         working-directory: backend
@@ -35,7 +35,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}/backend:/workspace" \
             -w /workspace \
-            golangci/golangci-lint:v1.64.8 \
+            golangci/golangci-lint:v2.12.2 \
             golangci-lint run ./...
       - name: Test
         working-directory: backend
@@ -68,19 +68,26 @@ jobs:
           name: pulseops-api-image
       - name: Load image
         run: docker load -i pulseops-api.tar
-      - name: Run Trivy vulnerability scan
+      - name: Generate Trivy SARIF report
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: pulseops-api:${{ github.sha }}
           format: sarif
           output: trivy-results.sarif
           severity: HIGH,CRITICAL
-          exit-code: "1"
+          exit-code: "0"
       - name: Upload Trivy SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: pulseops-api:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "1"
 
   deploy:
     runs-on: ubuntu-latest
