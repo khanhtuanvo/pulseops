@@ -77,6 +77,9 @@ func (r *mutationResolver) CreateTeam(ctx context.Context, name string) (*model.
 	if err != nil {
 		return nil, err
 	}
+	if err := requireNonEmpty("name", name); err != nil {
+		return nil, err
+	}
 
 	ownerID, err := primitive.ObjectIDFromHex(claims.UserID)
 	if err != nil {
@@ -106,6 +109,9 @@ func (r *mutationResolver) CreateTeam(ctx context.Context, name string) (*model.
 // InviteMember is the resolver for the inviteMember field.
 func (r *mutationResolver) InviteMember(ctx context.Context, teamID string, email string, role model.Role) (*model.User, error) {
 	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return nil, err
+	}
+	if err := requireNonEmpty("email", email); err != nil {
 		return nil, err
 	}
 
@@ -162,6 +168,9 @@ func (r *mutationResolver) RemoveMember(ctx context.Context, teamID string, user
 // UpdateSchedule is the resolver for the updateSchedule field.
 func (r *mutationResolver) UpdateSchedule(ctx context.Context, teamID string, rotation []string, intervalDays int) (*model.OnCallSchedule, error) {
 	if err := requireOwnerForTeam(ctx, teamID); err != nil {
+		return nil, err
+	}
+	if err := validateRotation(rotation); err != nil {
 		return nil, err
 	}
 	if intervalDays <= 0 {
@@ -239,6 +248,12 @@ func (r *mutationResolver) UpsertRunbook(ctx context.Context, id *string, teamID
 	if err := requireOwnerForTeam(ctx, teamID); err != nil {
 		return nil, err
 	}
+	if err := requireNonEmpty("title", title); err != nil {
+		return nil, err
+	}
+	if err := requireNonEmpty("content", content); err != nil {
+		return nil, err
+	}
 
 	teamObjectID, err := primitive.ObjectIDFromHex(teamID)
 	if err != nil {
@@ -274,6 +289,12 @@ func (r *mutationResolver) UpsertRunbook(ctx context.Context, id *string, teamID
 func (r *mutationResolver) CreatePostmortem(ctx context.Context, incidentID string, summary string, timeline string, actionItems []string) (*model.Postmortem, error) {
 	claims, err := auth.RequireRole(ctx, "OWNER", "RESPONDER")
 	if err != nil {
+		return nil, err
+	}
+	if err := requireNonEmpty("summary", summary); err != nil {
+		return nil, err
+	}
+	if err := requireNonEmpty("timeline", timeline); err != nil {
 		return nil, err
 	}
 
@@ -350,6 +371,9 @@ func (r *queryResolver) Incidents(ctx context.Context, teamID *string, status *m
 	}
 	if teamID != nil && *teamID != claims.TeamID {
 		return nil, auth.ErrUnauthorized
+	}
+	if err := validateTimeRange(from, to); err != nil {
+		return nil, err
 	}
 
 	filters := incidents.ListFilters{
@@ -434,6 +458,10 @@ func (r *queryResolver) Team(ctx context.Context, id string) (*model.Team, error
 func (r *queryResolver) Analytics(ctx context.Context, teamID *string, from *time.Time, to *time.Time) (*model.Analytics, error) {
 	claims, err := auth.RequireAuth(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := validateTimeRange(from, to); err != nil {
 		return nil, err
 	}
 

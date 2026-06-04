@@ -57,6 +57,8 @@ func NewRouter(cfg *config.Config, db *mongo.Database, logger *zap.Logger, hub *
 			CheckOrigin: allowedWebSocketOrigin(cfg.AllowedOrigins),
 		},
 	})
+	graphQLServer.SetErrorPresenter(appgraph.NewErrorPresenter(logger))
+	graphQLServer.SetRecoverFunc(appgraph.NewRecoverFunc(logger))
 
 	router.Use(requestIDMiddleware)
 	router.Use(recoveryMiddleware(logger))
