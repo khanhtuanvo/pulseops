@@ -82,6 +82,31 @@ export interface IncidentFilters {
   offset?: number;
 }
 
+export interface ScheduleOverride {
+  id: string;
+  user: Pick<User, 'id' | 'name'>;
+  startsAt: string;
+  endsAt: string;
+  reason: string;
+}
+
+export interface OnCallSchedule {
+  id: string;
+  intervalDays: number;
+  cycleStart: string;
+  rotation: Array<Pick<User, 'id' | 'name' | 'email' | 'role'>>;
+  currentOnCall: Pick<User, 'id' | 'name'>;
+  overrides: ScheduleOverride[];
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  apiKeyHint?: string | null;
+  members: User[];
+  onCallSchedule?: OnCallSchedule | null;
+}
+
 export interface Analytics {
   mttrSeconds: number;
   mttaSeconds: number;

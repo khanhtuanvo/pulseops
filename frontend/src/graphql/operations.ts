@@ -144,3 +144,96 @@ export const CREATE_POSTMORTEM = gql`
     }
   }
 `;
+
+export const TEAM_QUERY = gql`
+  ${USER_FIELDS}
+  query Team($id: ID!) {
+    team(id: $id) {
+      id
+      name
+      apiKeyHint
+      members {
+        ...UserFields
+      }
+      onCallSchedule {
+        id
+        intervalDays
+        cycleStart
+        rotation {
+          id
+          name
+          email
+          role
+        }
+        currentOnCall {
+          id
+          name
+        }
+        overrides {
+          id
+          startsAt
+          endsAt
+          reason
+          user {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const INVITE_MEMBER = gql`
+  ${USER_FIELDS}
+  mutation InviteMember($teamId: ID!, $email: String!, $role: Role!) {
+    inviteMember(teamId: $teamId, email: $email, role: $role) {
+      ...UserFields
+    }
+  }
+`;
+
+export const REMOVE_MEMBER = gql`
+  mutation RemoveMember($teamId: ID!, $userId: ID!) {
+    removeMember(teamId: $teamId, userId: $userId)
+  }
+`;
+
+export const UPDATE_SCHEDULE = gql`
+  mutation UpdateSchedule($teamId: ID!, $rotation: [ID!]!, $intervalDays: Int!) {
+    updateSchedule(teamId: $teamId, rotation: $rotation, intervalDays: $intervalDays) {
+      id
+      intervalDays
+      cycleStart
+      rotation {
+        id
+        name
+      }
+      currentOnCall {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const ADD_OVERRIDE = gql`
+  mutation AddOverride($teamId: ID!, $userId: ID!, $startsAt: Time!, $endsAt: Time!, $reason: String!) {
+    addOverride(teamId: $teamId, userId: $userId, startsAt: $startsAt, endsAt: $endsAt, reason: $reason) {
+      id
+      startsAt
+      endsAt
+      reason
+      user {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const ROTATE_API_KEY = gql`
+  mutation RotateApiKey($teamId: ID!) {
+    rotateApiKey(teamId: $teamId)
+  }
+`;

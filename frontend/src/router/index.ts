@@ -5,6 +5,7 @@ import AuthCallback from '@/views/AuthCallback.vue';
 import DashboardView from '@/views/DashboardView.vue';
 import IncidentDetailView from '@/views/IncidentDetailView.vue';
 import LoginView from '@/views/LoginView.vue';
+import TeamSettingsView from '@/views/TeamSettingsView.vue';
 import TeamView from '@/views/TeamView.vue';
 
 const router = createRouter({
@@ -30,6 +31,12 @@ const router = createRouter({
       name: 'team',
       component: TeamView,
       meta: { requiresAuth: true, roles: ['OWNER', 'RESPONDER'] },
+    },
+    {
+      path: '/team/settings',
+      name: 'team-settings',
+      component: TeamSettingsView,
+      meta: { requiresAuth: true, roles: ['OWNER'] },
     },
   ],
 });

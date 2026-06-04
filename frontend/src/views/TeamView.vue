@@ -19,6 +19,13 @@ const authStore = useAuthStore();
       <p class="mt-2 text-sm text-zinc-400">
         {{ authStore.user?.teamId }}
       </p>
+      <RouterLink
+        v-if="authStore.isOwner"
+        class="mt-4 inline-block rounded-md bg-cyan-400 px-3 py-2 text-sm font-semibold text-zinc-950"
+        to="/team/settings"
+      >
+        Team settings
+      </RouterLink>
     </section>
   </main>
 </template>
