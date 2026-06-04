@@ -59,6 +59,10 @@ func main() {
 	}
 	logger.Info("mongodb indexes ready")
 
+	if err := server.SeedE2EData(appCtx, db); err != nil {
+		logger.Fatal("seed e2e data", zap.Error(err))
+	}
+
 	hub := streams.NewHub()
 	go streams.StartChangeStreamListener(appCtx, db, hub, logger)
 	go escalation.NewChecker(db, hub, logger).Start(appCtx)
