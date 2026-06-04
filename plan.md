@@ -63,24 +63,56 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 | 12.1 | OpenTelemetry tracing | [x] |
 | 12.2 | Structured request logging | [x] |
 | 12.3 | Project README | [x] |
-| 12.4 | Demo recording and resume bullets | [ ] |
+| 12.4 | Demo recording and resume bullets | [~] |
 | 13.1 | Set up Playwright for E2E testing | [x] |
-| 13.2 | E2E test: login flow | [ ] |
+| 13.2 | E2E test: login flow | [x] |
 | 13.3 | E2E test: real-time incident flow | [ ] |
-| 13.4 | Go integration tests for webhook pipeline | [ ] |
-| 13.5 | Go unit tests for auth package | [ ] |
-| 13.6 | Unit tests for fingerprint engine and state machine | [ ] |
+| 13.4 | Go integration tests for webhook pipeline | [x] |
+| 13.5 | Go unit tests for auth package | [x] |
+| 13.6 | Unit tests for fingerprint engine and state machine | [x] |
 | 14.1 | Synthetic alert generator script | [ ] |
 | 14.2 | Performance baseline test | [ ] |
 | 14.3 | Go benchmarks for critical path | [ ] |
-| 15.1 | Postmortem workflow | [ ] |
-| 15.2 | Escalation policy enforcement | [ ] |
-| 15.3 | API key management UI | [ ] |
-| 15.4 | Harden error handling across all resolvers | [ ] |
+| 15.1 | Postmortem workflow | [x] |
+| 15.2 | Escalation policy enforcement | [x] |
+| 15.3 | API key management UI | [x] |
+| 15.4 | Harden error handling across all resolvers | [~] |
 | 15.5 | Interview preparation document | [ ] |
 | 15.6 | Final portfolio packaging | [ ] |
 
-**Current step: 13.2** — login-flow E2E tests are implemented; full pass needs Docker Desktop running for the Compose stack
+Legend: `[x]` done · `[~]` partially done · `[ ]` not started
+
+**Current step: 13.3** (all Tier-1 functional gaps closed; remaining work is the testing/perf hardening track + portfolio polish)
+
+---
+
+## Next steps (prioritized)
+
+> Reconciled against the actual codebase on 2026-06-04. The git history (`feat: implement phase 1-12`) landed far more than the old tracker reflected; statuses above were corrected to match what is actually in the repo. The items below are everything still open, ordered by impact.
+
+### Tier 1 — functional gaps (a user can hit these)
+1. ~~**15.2 Escalation policy enforcement**~~ — ✅ **Done** (this session). Added `backend/internal/escalation` with a background `Checker` (started from `main.go`, panic-guarded, 60s ticker) that flips stale un-acknowledged `TRIGGERED` incidents to `escalated=true` and publishes `INCIDENT_ESCALATED` to the Hub. Per-team thresholds via an optional `TeamDoc.EscalationPolicy` (defaults: tier-1 5 min, tier-2 15 min log-only). Pure decision helpers (`DueForTier1`/`DueForTier2`) are unit-tested. *Follow-ups:* no GraphQL mutation/UI yet to edit `EscalationPolicy` (set directly in Mongo for now); the change stream also emits a redundant `ALERT_ATTACHED` for the escalation write since status stays `TRIGGERED` (harmless, could be filtered).
+2. ~~**15.3 API key management UI**~~ — ✅ **Done** (this session). New `frontend/src/views/TeamSettingsView.vue` at `/team/settings` (owner-only route). Three sections: members (table + invite form + remove with last-owner/self guards), on-call schedule (rotation reorder + interval daily/weekly/biweekly + overrides form), and API key (masked hint, rotate-with-confirmation, one-time full-key reveal modal with copy). Added `TEAM_QUERY`, `INVITE_MEMBER`, `REMOVE_MEMBER`, `UPDATE_SCHEDULE`, `ADD_OVERRIDE`, `ROTATE_API_KEY` operations + `Team`/`OnCallSchedule`/`ScheduleOverride` types, and a settings link in `TeamView.vue`. *Simplifications vs. spec:* rotation reorder uses ↑/↓ buttons (not HTML5 drag-and-drop, to stay dependency-free); no cycle-start date picker because the `updateSchedule` mutation doesn't accept one (backend sets `cycleStart = now`).
+
+### Tier 2 — test & reliability hardening (start here next)
+3. ~~**13.4 Go integration tests for the webhook pipeline**~~ — ✅ **Done** (this session). Added `backend/internal/alerting/integration_test.go` (build tag `integration`, same package so it reuses `hashString`/`Fingerprint`). Five tests: new incident (201), in-window dedup (200 + `alertCount==2` + 2 alerts), **post-TTL re-fire → 2 incidents**, invalid API key (401, 0 incidents), rate-limit (101st → 429 + `Retry-After`). Each test uses an isolated, auto-dropped database. Added an `integration-test` CI job to `backend-ci.yml` that boots a single-node Mongo replica set and runs `go test -tags integration ./internal/alerting/...`. *Not run locally* — no Mongo replica set in the dev sandbox; verified it compiles/vets under the tag and runs in CI.
+4. **13.3 E2E real-time incident flow** — *Now highest priority.* Only `auth.spec.ts` exists. Add a Playwright spec: POST a webhook alert → assert the incident appears live on the dashboard via the subscription, then acknowledge/resolve through the UI.
+5. **15.4 Harden error handling across resolvers** *(partial)* — GraphQL resolvers leak internal errors (raw `err` returned to clients). Introduce a sanitized error layer (log full error + request ID server-side, return a safe message/code to the client). The three critical bugs found this session are already fixed (see below).
+
+### Tier 3 — performance & portfolio polish
+6. **14.1 Synthetic alert generator** — `scripts/load.sh` (or Go) that fires N alerts/sec at `/webhooks/alerts` with mixed fingerprints.
+7. **14.3 Go benchmarks** — `Benchmark` funcs for the hot path (`Fingerprint`, payload normalization, `Hub.Publish` fan-out).
+8. **14.2 Performance baseline** — capture p50/p95 webhook latency and dedup throughput; record numbers in the README.
+9. **12.4 Demo recording** *(partial — resume bullets already in README)* — record the live-dashboard demo.
+10. **15.5 Interview prep doc** and **15.6 Final portfolio packaging** — wrap-up artifacts.
+
+### Open operational item (from this session's bug fixes)
+- The incidents `fingerprint` index was changed from **unique** to non-unique to make post-TTL re-fires work (plan STEP 13.4 acceptance). On a **fresh** DB this is seamless; on an **existing** DB the old `fingerprint_1` unique index must be dropped or `CreateIndexes` will fail at startup with an index-options conflict. Decide: add a drop-if-exists migration to `mongodb.CreateIndexes`, or document a manual `db.incidents.dropIndex(...)`.
+
+### Recent fixes already applied (not yet committed)
+- **OnCallStatus subscription panic** — `close(out)` → `defer close(out)` in `schema.resolvers.go` (was crashing the process on first send).
+- **Dedup 500 after TTL window** — incidents `fingerprint` index made non-unique + `handleDuplicateAlert` now targets the latest incident.
+- **ReDoS in runbook search** — user query now passed through `regexp.QuoteMeta`.
 
 ---
 
@@ -1427,35 +1459,7 @@ Log at ERROR level with full context for:
 
 ---
 
-### STEP 12.3 — Write the project README
-
-Rewrite `README.md` at the repository root as a complete technical document.
-
-Include these sections:
-
-**Overview** — 2-3 sentences describing what PulseOps is and who it is for
-
-**Architecture** — the system boundary diagram described as text with an ASCII representation of the data flow: `Alert Source → Go API → MongoDB → Change Stream → Hub → WebSocket → Vue Dashboard`
-
-**Tech stack** — table listing frontend, backend, database, cloud, and DevOps tools with one-line descriptions
-
-**Local development** — exact steps: prerequisites (Docker, Go 1.22, Node 20), clone, copy `.env.example`, fill in Google OAuth credentials, `docker-compose up`, verify health check
-
-**Design decisions** — a bullet list of intentional trade-offs:
-- MongoDB-only (no Redis): TTL indexes replace ephemeral cache; acceptable TTL precision at this scale
-- Go monolith (not microservices): single deployable unit reduces ops overhead; package separation maintains architectural clarity
-- Rule-based fingerprinting (not ML): deterministic, explainable, zero training data required
-- Single Container App instance (phase 1): WebSocket fan-out is in-process; Change Streams would serve as shared pub-sub at scale
-- OAuth PKCE (not DIY JWT login): industry standard, delegates credential security to Google
-
-**Known limitations** — honest list:
-- WebSocket subscriptions are not horizontally scalable without replacing the in-process Hub with a shared pub-sub (MongoDB Change Streams fan-out or Redis pub-sub)
-- Token revocation window: up to 15 minutes after a user is removed from a team, their existing JWT remains valid
-- MongoDB TTL cleanup granularity: 60-second background sweep (not millisecond precision)
-
-Commit with message `docs: write complete project README`.
-
-**Verification:** `README.md` renders correctly on GitHub. Architecture section is present. Local development steps work when followed from scratch on a clean machine.
+### STEP 12.3 — Write the projec
 
 ### STEP 12.4 — Record the demo and write resume bullets
 
