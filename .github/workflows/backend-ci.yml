@@ -35,11 +35,46 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}/backend:/workspace" \
             -w /workspace \
-            golangci/golangci-lint:v2.12.2 \
+              golangci/golangci-lint:v1.64.8 \
             golangci-lint run ./...
       - name: Test
         working-directory: backend
         run: go test ./... -race -count=1
+
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.10"
+          cache-dependency-path: backend/go.sum
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name mongo -p 27017:27017 mongo:7 --replSet rs0
+          for attempt in {1..30}; do
+            if docker exec mongo mongosh --quiet --eval 'db.runCommand({ ping: 1 })' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec mongo mongosh --quiet --eval 'rs.initiate()'
+          for attempt in {1..30}; do
+            state="$(docker exec mongo mongosh --quiet --eval 'rs.status().myState' 2>/dev/null || true)"
+            if [ "$state" = "1" ]; then
+              echo "Replica set primary is ready"
+              break
+            fi
+            sleep 1
+          done
+      - name: Download dependencies
+        working-directory: backend
+        run: go mod download
+      - name: Run integration tests
+        working-directory: backend
+        env:
+          MONGODB_TEST_URI: mongodb://localhost:27017/?replicaSet=rs0
+        run: go test -tags integration ./internal/alerting/... -count=1
 
   build-image:
     runs-on: ubuntu-latest
