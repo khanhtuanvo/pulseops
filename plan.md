@@ -70,7 +70,7 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 | 13.4 | Go integration tests for webhook pipeline | [x] |
 | 13.5 | Go unit tests for auth package | [x] |
 | 13.6 | Unit tests for fingerprint engine and state machine | [x] |
-| 14.1 | Synthetic alert generator script | [ ] |
+| 14.1 | Synthetic alert generator script | [x] |
 | 14.2 | Performance baseline test | [ ] |
 | 14.3 | Go benchmarks for critical path | [ ] |
 | 15.1 | Postmortem workflow | [x] |
@@ -82,7 +82,7 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 
 Legend: `[x]` done · `[~]` partially done · `[ ]` not started
 
-**Current step: 14.1** (all Tier-1 functional gaps + the test track closed; remaining work is the perf track + portfolio polish)
+**Current step: 14.3** (remaining work is Go benchmarks, perf baseline, and portfolio polish)
 
 ---
 
@@ -100,7 +100,7 @@ Legend: `[x]` done · `[~]` partially done · `[ ]` not started
 5. **15.4 Harden error handling across resolvers** *(partial)* — GraphQL resolvers leak internal errors (raw `err` returned to clients). Introduce a sanitized error layer (log full error + request ID server-side, return a safe message/code to the client). The three critical bugs found earlier are already fixed (see below).
 
 ### Tier 3 — performance & portfolio polish (start here next)
-6. **14.1 Synthetic alert generator** — *Now highest priority.* `scripts/load.sh` (or Go) that fires N alerts/sec at `/webhooks/alerts` with mixed fingerprints.
+6. ~~**14.1 Synthetic alert generator**~~ — ✅ **Done** (this session). `scripts/load-test/generate-alerts.sh` — `curl` loop with `--count/--rate/--api-key/--url/--scenario` (random varies source/alertName/severity/environment; duplicate sends one fingerprint to exercise dedup). Prints progress every 10 alerts (sent, effective rate, HTTP status breakdown). Verified end-to-end against a local test server (status counting, pacing, progress); arg validation covered.
 7. **14.3 Go benchmarks** — `Benchmark` funcs for the hot path (`Fingerprint`, payload normalization, `Hub.Publish` fan-out).
 8. **14.2 Performance baseline** — capture p50/p95 webhook latency and dedup throughput; record numbers in the README.
 9. **12.4 Demo recording** *(partial — resume bullets already in README)* — record the live-dashboard demo.
