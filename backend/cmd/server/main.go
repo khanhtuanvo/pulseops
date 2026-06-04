@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tuankhanhvo/pulseops/internal/escalation"
 	"github.com/tuankhanhvo/pulseops/internal/server"
 	"github.com/tuankhanhvo/pulseops/internal/streams"
 	"github.com/tuankhanhvo/pulseops/pkg/config"
@@ -60,6 +61,7 @@ func main() {
 
 	hub := streams.NewHub()
 	go streams.StartChangeStreamListener(appCtx, db, hub, logger)
+	go escalation.NewChecker(db, hub, logger).Start(appCtx)
 
 	router := server.NewRouter(&cfg, db, logger, hub)
 	httpServer := &http.Server{

@@ -77,12 +77,20 @@ type UserDoc struct {
 }
 
 type TeamDoc struct {
-	ID         primitive.ObjectID `bson:"_id,omitempty"`
-	Name       string             `bson:"name"`
-	APIKeyHash string             `bson:"apiKeyHash"`
-	APIKeyHint string             `bson:"apiKeyHint"`
-	CreatedAt  time.Time          `bson:"createdAt"`
-	OwnerID    primitive.ObjectID `bson:"ownerId"`
+	ID               primitive.ObjectID `bson:"_id,omitempty"`
+	Name             string             `bson:"name"`
+	APIKeyHash       string             `bson:"apiKeyHash"`
+	APIKeyHint       string             `bson:"apiKeyHint"`
+	CreatedAt        time.Time          `bson:"createdAt"`
+	OwnerID          primitive.ObjectID `bson:"ownerId"`
+	EscalationPolicy *EscalationPolicy  `bson:"escalationPolicy,omitempty"`
+}
+
+// EscalationPolicy controls how long an un-acknowledged incident waits before
+// it is escalated. Zero values fall back to the package defaults.
+type EscalationPolicy struct {
+	Tier1WaitMinutes int `bson:"tier1WaitMinutes"`
+	Tier2WaitMinutes int `bson:"tier2WaitMinutes"`
 }
 
 type OnCallScheduleDoc struct {
