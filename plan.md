@@ -72,7 +72,7 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 | 13.6 | Unit tests for fingerprint engine and state machine | [x] |
 | 14.1 | Synthetic alert generator script | [x] |
 | 14.2 | Performance baseline test | [ ] |
-| 14.3 | Go benchmarks for critical path | [ ] |
+| 14.3 | Go benchmarks for critical path | [x] |
 | 15.1 | Postmortem workflow | [x] |
 | 15.2 | Escalation policy enforcement | [x] |
 | 15.3 | API key management UI | [x] |
@@ -82,7 +82,7 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 
 Legend: `[x]` done · `[~]` partially done · `[ ]` not started
 
-**Current step: 14.3** (remaining work is Go benchmarks, perf baseline, and portfolio polish)
+**Current step: 14.2** (remaining work is perf baseline capture + portfolio polish; both need a live stack/host)
 
 ---
 
@@ -101,7 +101,7 @@ Legend: `[x]` done · `[~]` partially done · `[ ]` not started
 
 ### Tier 3 — performance & portfolio polish (start here next)
 6. ~~**14.1 Synthetic alert generator**~~ — ✅ **Done** (this session). `scripts/load-test/generate-alerts.sh` — `curl` loop with `--count/--rate/--api-key/--url/--scenario` (random varies source/alertName/severity/environment; duplicate sends one fingerprint to exercise dedup). Prints progress every 10 alerts (sent, effective rate, HTTP status breakdown). Verified end-to-end against a local test server (status counting, pacing, progress); arg validation covered.
-7. **14.3 Go benchmarks** — `Benchmark` funcs for the hot path (`Fingerprint`, payload normalization, `Hub.Publish` fan-out).
+7. ~~**14.3 Go benchmarks**~~ — ✅ **Done** (this session). `backend/internal/alerting/benchmark_test.go`: `BenchmarkFingerprint` (pure CPU — captured at ~263 ns/op), `BenchmarkFingerprintDedup` (dup-insert + incident read), and `BenchmarkWebhookHandler` (full request→write, with the rate limiter reset outside the timed region). DB-backed benchmarks skip cleanly when Mongo is absent. Results recorded in `docs/performance.md`. *DB-backed numbers still need capturing on a replica-set host* — see 14.2.
 8. **14.2 Performance baseline** — capture p50/p95 webhook latency and dedup throughput; record numbers in the README.
 9. **12.4 Demo recording** *(partial — resume bullets already in README)* — record the live-dashboard demo.
 10. **15.5 Interview prep doc** and **15.6 Final portfolio packaging** — wrap-up artifacts.
