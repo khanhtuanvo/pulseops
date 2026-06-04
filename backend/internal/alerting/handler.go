@@ -153,7 +153,9 @@ func handleDuplicateAlert(w http.ResponseWriter, r *http.Request, db *mongo.Data
 		r.Context(),
 		bson.M{"teamId": teamID, "fingerprint": scopedFingerprint},
 		bson.M{"$inc": bson.M{"alertCount": 1}},
-		options.FindOneAndUpdate().SetReturnDocument(options.After),
+		options.FindOneAndUpdate().
+			SetReturnDocument(options.After).
+			SetSort(bson.D{{Key: "triggeredAt", Value: -1}}),
 	).Decode(&incident)
 	if err != nil {
 		logger.Error("webhook duplicate incident update failed", zap.Error(err), zap.String("teamId", teamID.Hex()), zap.String("fingerprint", scopedFingerprint))

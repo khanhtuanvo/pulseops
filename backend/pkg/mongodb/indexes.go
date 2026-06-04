@@ -17,7 +17,10 @@ func CreateIndexes(db *mongo.Database) error {
 		"incidents": {
 			{Keys: bson.D{{Key: "teamId", Value: 1}, {Key: "status", Value: 1}}},
 			{Keys: bson.D{{Key: "teamId", Value: 1}, {Key: "triggeredAt", Value: -1}}},
-			{Keys: bson.D{{Key: "fingerprint", Value: 1}}, Options: options.Index().SetUnique(true)},
+			// Not unique: deduplication is enforced by the TTL-bounded `fingerprints`
+			// collection (unique `_id`). Once that doc expires (60s window) a repeat
+			// alert must be able to open a *new* incident with the same fingerprint.
+			{Keys: bson.D{{Key: "teamId", Value: 1}, {Key: "fingerprint", Value: 1}}},
 		},
 		"alerts": {
 			{Keys: bson.D{{Key: "incidentId", Value: 1}}},

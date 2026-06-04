@@ -3,6 +3,7 @@ package runbooks
 import (
 	"context"
 	"errors"
+	"regexp"
 	"time"
 
 	"github.com/tuankhanhvo/pulseops/internal/incidents"
@@ -65,7 +66,9 @@ func (r *Repository) List(ctx context.Context, teamID string, query string) ([]*
 
 	filter := bson.M{"teamId": teamObjectID}
 	if query != "" {
-		pattern := primitive.Regex{Pattern: query, Options: "i"}
+		// Escape the user input so it is treated as a literal substring rather
+		// than a regular expression (prevents ReDoS and metacharacter surprises).
+		pattern := primitive.Regex{Pattern: regexp.QuoteMeta(query), Options: "i"}
 		filter["$or"] = bson.A{
 			bson.M{"title": pattern},
 			bson.M{"tags": pattern},

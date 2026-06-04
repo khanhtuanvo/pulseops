@@ -548,7 +548,7 @@ func (r *subscriptionResolver) OnCallStatus(ctx context.Context, teamID string) 
 
 	out := make(chan *model.OnCallStatusEvent, 1)
 	go func() {
-		close(out)
+		defer close(out)
 		for {
 			event, err := r.onCallStatusEvent(ctx, teamID, time.Now().UTC())
 			if err != nil {
