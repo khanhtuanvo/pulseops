@@ -66,7 +66,7 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 | 12.4 | Demo recording and resume bullets | [~] |
 | 13.1 | Set up Playwright for E2E testing | [x] |
 | 13.2 | E2E test: login flow | [x] |
-| 13.3 | E2E test: real-time incident flow | [ ] |
+| 13.3 | E2E test: real-time incident flow | [x] |
 | 13.4 | Go integration tests for webhook pipeline | [x] |
 | 13.5 | Go unit tests for auth package | [x] |
 | 13.6 | Unit tests for fingerprint engine and state machine | [x] |
@@ -82,7 +82,7 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 
 Legend: `[x]` done · `[~]` partially done · `[ ]` not started
 
-**Current step: 13.3** (all Tier-1 functional gaps closed; remaining work is the testing/perf hardening track + portfolio polish)
+**Current step: 14.1** (all Tier-1 functional gaps + the test track closed; remaining work is the perf track + portfolio polish)
 
 ---
 
@@ -96,11 +96,11 @@ Legend: `[x]` done · `[~]` partially done · `[ ]` not started
 
 ### Tier 2 — test & reliability hardening (start here next)
 3. ~~**13.4 Go integration tests for the webhook pipeline**~~ — ✅ **Done** (this session). Added `backend/internal/alerting/integration_test.go` (build tag `integration`, same package so it reuses `hashString`/`Fingerprint`). Five tests: new incident (201), in-window dedup (200 + `alertCount==2` + 2 alerts), **post-TTL re-fire → 2 incidents**, invalid API key (401, 0 incidents), rate-limit (101st → 429 + `Retry-After`). Each test uses an isolated, auto-dropped database. Added an `integration-test` CI job to `backend-ci.yml` that boots a single-node Mongo replica set and runs `go test -tags integration ./internal/alerting/...`. *Not run locally* — no Mongo replica set in the dev sandbox; verified it compiles/vets under the tag and runs in CI.
-4. **13.3 E2E real-time incident flow** — *Now highest priority.* Only `auth.spec.ts` exists. Add a Playwright spec: POST a webhook alert → assert the incident appears live on the dashboard via the subscription, then acknowledge/resolve through the UI.
-5. **15.4 Harden error handling across resolvers** *(partial)* — GraphQL resolvers leak internal errors (raw `err` returned to clients). Introduce a sanitized error layer (log full error + request ID server-side, return a safe message/code to the client). The three critical bugs found this session are already fixed (see below).
+4. ~~**13.3 E2E real-time incident flow**~~ — ✅ **Done** (this session). New `frontend/e2e/incidents.spec.ts` with 4 specs: live appearance via subscription (severity + TRIGGERED), acknowledge updates the card (RESPONDER), viewer sees no Ack button, and the two-tab fan-out proof. To support it, the backend now seeds a deterministic E2E team (id matches the auth bypass) with a known API key under `ENV=test` (`server.SeedE2EData`, e2etest-tagged + no-op otherwise, called from `main.go`). The spec waits for the subscription websocket to open before posting (the Hub does not replay events). *Not run locally* — needs the full e2e docker-compose stack; verified specs parse via `playwright test --list`. Runs in the existing `e2e.yml` job.
+5. **15.4 Harden error handling across resolvers** *(partial)* — GraphQL resolvers leak internal errors (raw `err` returned to clients). Introduce a sanitized error layer (log full error + request ID server-side, return a safe message/code to the client). The three critical bugs found earlier are already fixed (see below).
 
-### Tier 3 — performance & portfolio polish
-6. **14.1 Synthetic alert generator** — `scripts/load.sh` (or Go) that fires N alerts/sec at `/webhooks/alerts` with mixed fingerprints.
+### Tier 3 — performance & portfolio polish (start here next)
+6. **14.1 Synthetic alert generator** — *Now highest priority.* `scripts/load.sh` (or Go) that fires N alerts/sec at `/webhooks/alerts` with mixed fingerprints.
 7. **14.3 Go benchmarks** — `Benchmark` funcs for the hot path (`Fingerprint`, payload normalization, `Hub.Publish` fan-out).
 8. **14.2 Performance baseline** — capture p50/p95 webhook latency and dedup throughput; record numbers in the README.
 9. **12.4 Demo recording** *(partial — resume bullets already in README)* — record the live-dashboard demo.
