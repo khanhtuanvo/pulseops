@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -7,4 +9,17 @@ linters:
     - govet
     - staticcheck
     - unused
+  # Reproduce golangci-lint v1's default exclusions (v2 ships them off by
+  # default). `legacy` + `std-error-handling` silence the well-known
+  # errcheck false-positives on deferred *.Close()/*.Flush() and fmt.Print*.
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+
+formatters:
+  enable:
     - gofmt

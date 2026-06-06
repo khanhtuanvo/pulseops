@@ -35,7 +35,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}/backend:/workspace" \
             -w /workspace \
-              golangci/golangci-lint:v1.64.8 \
+              golangci/golangci-lint:v2.12.2 \
             golangci-lint run ./...
       - name: Test
         working-directory: backend
@@ -58,7 +58,7 @@ jobs:
             fi
             sleep 1
           done
-          docker exec mongo mongosh --quiet --eval 'rs.initiate()'
+          docker exec mongo mongosh --quiet --eval 'rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })'
           for attempt in {1..30}; do
             state="$(docker exec mongo mongosh --quiet --eval 'rs.status().myState' 2>/dev/null || true)"
             if [ "$state" = "1" ]; then

@@ -1,5 +1,69 @@
 # PulseOps — Agentic Coding Plan
 
+## Current project direction: high-quality domain Q&A with RAG
+
+After professor clarification, the first product goal is **high-quality Q&A using RAG over trusted domain documents**. The expected users are professors/doctors who need fast answers over clinical, hospital, research, benchmark, and project documents.
+
+The chatbot should:
+- Find relevant domain knowledge quickly.
+- Compare information across hospital documents, research material, and curated notes.
+- Show citations/sources clearly enough that an expert can verify the answer.
+- Reduce time spent searching through many folders/files.
+- Avoid presenting unsupported medical claims as final truth.
+
+Explicit audience modes are **not required for the first phase**. The immediate focus is answer quality, retrieval quality, source quality, and evaluation.
+
+### Updated product priorities
+
+1. **Q&A answer quality first**
+   - Answers must be grounded in retrieved context.
+   - Prefer clear, specific answers with evidence and citations.
+   - Make uncertainty visible when retrieved context is weak or conflicting.
+   - Avoid adding unsupported model knowledge when sources do not contain the answer.
+
+2. **Domain corpus before UI polish**
+   - Curate the documents that professors/doctors actually need first.
+   - Normalize PDFs, Markdown, TXT, JSON, JSONL, and CSV into one indexed document schema.
+   - Preserve metadata such as title, source path, file type, corpus, section, page number, and source type.
+
+3. **Retrieval quality before model complexity**
+   - Keep Meilisearch as the first live retrieval layer.
+   - Use the RAG/benchmark folders to support evaluation and research comparisons before replacing the live pipeline.
+   - Only add dense/hybrid/ColBERT/Solr runtime retrieval after there is a clear quality gap.
+
+4. **Evaluation as RAG integration value**
+   - Use benchmark/evaluation pipelines to measure answer support, citation quality, retrieval quality, and hallucination risk.
+   - Treat PubMed/research material as either live research evidence or offline evaluation evidence based on professor guidance.
+
+### Proposed first milestone
+
+Build a working RAG Q&A flow:
+
+```text
+User question
+-> Chatbot backend API
+-> Retrieve top documents from indexed domain corpus
+-> LLM generates answer using retrieved context
+-> Return answer + structured sources + confidence/limitations
+-> Optional offline evaluator checks factual support
+```
+
+Success criteria:
+- A user can ask a domain question and get a sourced answer.
+- Sources are structured, readable, and traceable back to files/pages/sections.
+- The system can explain when it does not have enough evidence.
+- The same test questions can be reused to compare retrieval/model changes.
+
+### Current recommendation
+
+For the next phase, continue with the existing approach:
+- `Chatbot` remains the backend API/runtime.
+- `ChatbotWeb` remains the frontend.
+- `Chatbot/docs` becomes the live curated domain corpus.
+- `RAG` and `RAG-main` remain supporting sources for data, benchmarks, verifier ideas, and future retrieval experiments.
+
+Do not merge every RAG runtime into the chatbot yet. First prove that curated documents + Meilisearch + clear citations can produce strong Q&A answers.
+
 > **How to use this file**
 > Each numbered step below is a self-contained prompt for an agentic coding agent (Claude Code, Cursor, Copilot Workspace, etc).
 > Copy the step verbatim into the agent. Complete it fully and verify it works before moving to the next step.
@@ -82,13 +146,55 @@ Mark each step `[x]` when the verification check passes. Never mark done until t
 
 Legend: `[x]` done · `[~]` partially done · `[ ]` not started
 
-**Current step: 14.2** (remaining work is perf baseline capture + portfolio polish; both need a live stack/host)
+**Current step:** Pivot planning is complete. Next work should focus on RAG Q&A answer quality before additional portfolio polish.
 
 ---
 
 ## Next steps (prioritized)
 
-> Reconciled against the actual codebase on 2026-06-04. The git history (`feat: implement phase 1-12`) landed far more than the old tracker reflected; statuses above were corrected to match what is actually in the repo. The items below are everything still open, ordered by impact.
+> Reconciled against the clarified product direction on 2026-06-05. The original PulseOps incident-management plan remains below as implementation history, but the active priority is now high-quality domain Q&A using RAG.
+
+### Tier 0 — RAG Q&A quality pivot
+1. **Define the answer-quality target** — write 10-20 domain questions the chatbot should answer well. For each question, note the expected source files, expected answer points, and whether the answer should cite hospital docs, research evidence, or both.
+2. **Curate the first live corpus** — place only useful domain documents into the live docs folder. Avoid dumping noisy files until retrieval quality is acceptable.
+3. **Add metadata for retrieval and citation quality** — every indexed document should preserve `corpus`, `source_type`, `file_type`, `page_number`, `section`, and `source`.
+4. **Keep Meilisearch as the first retrieval layer** — index the curated domain corpus and validate top results manually for the example questions before changing retrieval engines.
+5. **Improve answer contract** — responses should include `response`, `sources`, and a short limitations/confidence field when evidence is weak.
+6. **Create an evaluation set** — turn the example questions into a small benchmark. Track retrieved documents, answer quality, citation correctness, and unsupported claims.
+7. **Use RAG benchmark code offline first** — use verifier/decomposition/PubMed logic to evaluate generated answers. Do not put the full benchmark pipeline in the live request path until latency and reliability are acceptable.
+8. **Compare retrieval approaches later** — after the baseline works, compare Meilisearch against dense/hybrid/ColBERT/Solr using the same evaluation set.
+
+### Recommended folder/source policy for the Q&A corpus
+- `Chatbot/docs/clinical_reference/` — domain reference material.
+- `Chatbot/docs/research_evidence/` — PubMed abstracts, papers, benchmark evidence, or research summaries when approved.
+- `Chatbot/docs/hospital_guides/` — hospital or Moffitt-style guides that can support clinical, operational, or education questions.
+- `Chatbot/docs/benchmark_qa/` — test questions and expected evidence for evaluation, not necessarily live answer context.
+
+### Professor meeting questions
+1. What are the top 10 questions the system must answer well for a demo?
+2. Which documents should be considered trusted sources for those questions?
+3. Should PubMed/research documents be used in live answers, offline evaluation, or both?
+4. What does a “good answer” look like: concise summary, detailed explanation, evidence table, or step-by-step reasoning?
+5. What source types are acceptable for citations: hospital docs, PubMed, guidelines, internal notes, benchmark files?
+6. How strict should the chatbot be when retrieved evidence is incomplete?
+7. What matters more for the first demo: retrieval quality, factuality verification, UI experience, or model comparison?
+
+### Recommendation for the next implementation phase
+Start with a narrow RAG Q&A demo:
+
+```text
+5-10 curated domain documents
++ 10 domain test questions
++ Meilisearch indexing
++ structured answer with sources
++ manual evaluation table
+```
+
+That gives the professor something concrete to judge before the project expands into advanced retrieval research or additional product modes.
+
+### Legacy PulseOps completion items
+
+The items below are still relevant only if the project continues as a general incident-management portfolio app.
 
 ### Tier 1 — functional gaps (a user can hit these)
 1. ~~**15.2 Escalation policy enforcement**~~ — ✅ **Done** (this session). Added `backend/internal/escalation` with a background `Checker` (started from `main.go`, panic-guarded, 60s ticker) that flips stale un-acknowledged `TRIGGERED` incidents to `escalated=true` and publishes `INCIDENT_ESCALATED` to the Hub. Per-team thresholds via an optional `TeamDoc.EscalationPolicy` (defaults: tier-1 5 min, tier-2 15 min log-only). Pure decision helpers (`DueForTier1`/`DueForTier2`) are unit-tested. *Follow-ups:* no GraphQL mutation/UI yet to edit `EscalationPolicy` (set directly in Mongo for now); the change stream also emits a redundant `ALERT_ATTACHED` for the escalation write since status stays `TRIGGERED` (harmless, could be filtered).
